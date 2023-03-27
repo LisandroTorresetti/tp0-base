@@ -10,6 +10,8 @@ services:
       - LOGGING_LEVEL=DEBUG
     networks:
       - testing_net
+    volumes:
+      - ./server/config.ini:/server-config/config.ini
 
 #Clients
 
@@ -19,3 +21,7 @@ networks:
       driver: default
       config:
         - subnet: 172.25.125.0/24
+
+volumes:
+  client-config:
+  server-config:

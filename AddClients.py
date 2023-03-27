@@ -1,6 +1,5 @@
 import sys
 
-
 def getClientsStructure(amountOfClients):
     clients = []
     for clientNum in range(1,amountOfClients + 1):
@@ -16,7 +15,9 @@ def getClientsStructure(amountOfClients):
                           f"    networks:\n" \
                           f"      - testing_net\n" \
                           f"    depends_on:\n" \
-                          f"      - server\n"
+                          f"      - server\n" \
+                          f"    volumes:\n" \
+                          f"      - ./client/config.yaml:/client-config/config.yaml\n"
 
         clients.append(clientStructure)
 
