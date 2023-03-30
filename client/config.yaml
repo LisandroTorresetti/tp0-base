@@ -1,8 +1,16 @@
 # id: 1
 server:
   address: "server:12345"
+
 loop:
   lapse: "0m20s"
   period: "5s"
+
 log:
   level: "info"
+
+server_ack: "PONG"
+
+end_message_marker: "|"
+
+packet_limit: 8192 # 8 * 1024
