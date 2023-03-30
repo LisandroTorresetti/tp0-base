@@ -3,6 +3,7 @@ package common
 import (
 	"bufio"
 	"fmt"
+	"github.com/7574-sistemas-distribuidos/docker-compose-init/client/clientbetinfo"
 	"net"
 	"os"
 	"os/signal"
@@ -14,10 +15,13 @@ import (
 
 // ClientConfig Configuration used by the client
 type ClientConfig struct {
-	ID            string
-	ServerAddress string
-	LoopLapse     time.Duration
-	LoopPeriod    time.Duration
+	ID               string
+	ServerAddress    string
+	LoopLapse        time.Duration
+	LoopPeriod       time.Duration
+	PacketLimit      int
+	ServerACK        string
+	EndMessageMarker string
 }
 
 // Client Entity that encapsulates how
@@ -107,4 +111,64 @@ loop:
 	}
 
 	log.Infof("action: loop_finished | result: success | client_id: %v", c.config.ID)
+}
+
+func (c *Client) SendBet(betInfo clientbetinfo.ClientBetInfo) error {
+	err := c.createClientSocket()
+	if err != nil {
+		log.Errorf("cannot send bet, connection FAILED")
+		return err
+	}
+
+	betAsString := betInfo.ToString()
+	betAsString += c.config.EndMessageMarker
+	betAsBytes := []byte(betAsString)
+	messageLength := len(betAsBytes)
+
+	amountOfMessages := int(messageLength/c.config.PacketLimit) + 1
+	log.Debugf("Amount of messages to send: %v", amountOfMessages)
+	shortWriteAvoidance := 0
+
+	for messageNum := 0; messageNum < amountOfMessages; messageNum++ {
+		log.Debugf("Message %v of %v", messageNum+1, amountOfMessages)
+
+		lowerLimit := messageNum*c.config.PacketLimit - shortWriteAvoidance
+		upperLimit := lowerLimit + c.config.PacketLimit
+
+		if upperLimit > messageLength {
+			upperLimit = messageLength
+		}
+
+		bytesToSend := betAsBytes[lowerLimit:upperLimit]
+		bytesSent, err := c.conn.Write(bytesToSend)
+		if err != nil {
+			return err
+		}
+		shortWriteAvoidance = len(bytesToSend) - bytesSent
+	}
+
+	log.Debugf("Bet from agency %v was sent", betInfo.AgencyID)
+	return nil
+}
+
+func (c *Client) ListenResponse() error {
+	response := make([]byte, 0) // Will contain the response from the server
+
+	for {
+		buffer := make([]byte, c.config.PacketLimit)
+		bytesRead, err := c.conn.Read(buffer)
+		if err != nil {
+			log.Errorf("unexpected error while trying to get server response: %w", err)
+			return err
+		}
+
+		response = append(response, buffer[:bytesRead]...)
+
+		if string(response) == c.config.ServerACK {
+			log.Debugf("Got server ACK!")
+			break
+		}
+	}
+
+	return c.conn.Close()
 }

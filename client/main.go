@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"github.com/7574-sistemas-distribuidos/docker-compose-init/client/betagency"
+	"github.com/7574-sistemas-distribuidos/docker-compose-init/client/clientbetinfo"
 	"strings"
 	"time"
 
@@ -36,6 +38,11 @@ func InitConfig() (*viper.Viper, error) {
 	v.BindEnv("loop", "lapse")
 	v.BindEnv("log", "level")
 
+	// New variables for exercise 5
+	v.BindEnv("server_ack")
+	v.BindEnv("end_message_marker")
+	v.BindEnv("packet_limit")
+
 	// Try to read configuration from config file. If config file
 	// does not exists then ReadInConfig will fail but configuration
 	// can be loaded from the environment variables so we shouldn't
@@ -66,11 +73,11 @@ func InitLogger(logLevel string) error {
 		return err
 	}
 
-    customFormatter := &logrus.TextFormatter{
-      TimestampFormat: "2006-01-02 15:04:05",
-      FullTimestamp: false,
-    }
-    logrus.SetFormatter(customFormatter)
+	customFormatter := &logrus.TextFormatter{
+		TimestampFormat: "2006-01-02 15:04:05",
+		FullTimestamp:   false,
+	}
+	logrus.SetFormatter(customFormatter)
 	logrus.SetLevel(level)
 	return nil
 }
@@ -79,12 +86,12 @@ func InitLogger(logLevel string) error {
 // For debugging purposes only
 func PrintConfig(v *viper.Viper) {
 	logrus.Infof("action: config | result: success | client_id: %s | server_address: %s | loop_lapse: %v | loop_period: %v | log_level: %s",
-	    v.GetString("id"),
-	    v.GetString("server.address"),
-	    v.GetDuration("loop.lapse"),
-	    v.GetDuration("loop.period"),
-	    v.GetString("log.level"),
-    )
+		v.GetString("id"),
+		v.GetString("server.address"),
+		v.GetDuration("loop.lapse"),
+		v.GetDuration("loop.period"),
+		v.GetString("log.level"),
+	)
 }
 
 func main() {
@@ -101,12 +108,35 @@ func main() {
 	PrintConfig(v)
 
 	clientConfig := common.ClientConfig{
-		ServerAddress: v.GetString("server.address"),
-		ID:            v.GetString("id"),
-		LoopLapse:     v.GetDuration("loop.lapse"),
-		LoopPeriod:    v.GetDuration("loop.period"),
+		ServerAddress:    v.GetString("server.address"),
+		ID:               v.GetString("id"),
+		LoopLapse:        v.GetDuration("loop.lapse"),
+		LoopPeriod:       v.GetDuration("loop.period"),
+		PacketLimit:      v.GetInt("packet_limit"),
+		ServerACK:        v.GetString("server_ack"),
+		EndMessageMarker: v.GetString("end_message_marker"),
 	}
-
 	client := common.NewClient(clientConfig)
-	client.StartClientLoop()
+
+	// Get client bet info
+	betInfo, err := clientbetinfo.GetBetInfo()
+	if err != nil {
+		log.Errorf("error getting bet info for client %v: %w", clientConfig.ID, err)
+		return
+	}
+	logrus.Infof("Client Bet Info: | Agency ID: %v | Client ID: %v | NAME: %s %s | NUMBER: %v ",
+		betInfo.AgencyID,
+		betInfo.ClientID,
+		betInfo.Name,
+		betInfo.Surname,
+		betInfo.Number,
+	)
+
+	betAgency := betagency.NewBetAgency(betInfo, client)
+	err = betAgency.RegisterBet()
+
+	if err != nil {
+		logrus.Errorf(err.Error())
+	}
+	log.Debug("Finish main.go")
 }
