@@ -1,4 +1,6 @@
 import logging
+import threading
+
 from .utils import *
 
 PACKET_LIMIT = 8 * 1024 # 8kB
@@ -15,10 +17,20 @@ class Agency:
         self.agenciesProcessed = 0
         self.finishProcessing = False
 
+        self.writeLock = None # For the fake DB
+        self.counterLock = None # For the counter of processed agencies
+
     '''Persists the bet of a client'''
     def persistBets(self, bets):
         logging.debug(f"bets from client {bets[0].document} is gonna be persisted")
+
+        logging.debug("Acquiring write lock")
+        self.writeLock.acquire()
+
         store_bets(bets)
+
+        logging.debug("Releasing write lock")
+        self.writeLock.release()
 
     '''Returns a Bet object that represents the bet of a client'''
     def getBetFromMessage(self, message):
@@ -45,17 +57,13 @@ class Agency:
                 if action == self.winnersAction:
                     logging.debug("A client is asking for the winners")
                     self.SendWinners(client, message)
-                    self.finishProcessing = True
-                    return
+                    return True
 
                 if action == self.config["ack"]:
                     logging.debug("Received FIN message, all bets were processed. Gonna send ACK to client")
                     self.SendResponse(client, self.config["ack"])
-                    self.finishProcessing = True
-                    self.agenciesProcessed += 1
-                    self.agenciesProcessed = min(self.agenciesProcessed, self.amountOfAgencies) # Sanity check
-
-                    return
+                    self.UpdateCounter()
+                    return True
 
                 logging.debug("invalid action got: " + action)
                 raise Exception
@@ -90,10 +98,18 @@ class Agency:
             lowerLimit -= PACKET_LIMIT - bytesSent
 
     def SendWinners(self, client, message):
+        logging.debug("Acquiring lock to know if we have to send winners")
+        self.counterLock.acquire()
         if self.agenciesProcessed < self.amountOfAgencies:
+            logging.debug("Releasing lock to know if we have to send winners")
+            self.counterLock.release()
             logging.debug("Still processing agencies...")
             response = "PROCESSING" + "|" + self.config["ack"]
             client.send(response.encode('utf-8'))
+            return
+
+        logging.debug("Releasing lock to know if we have to send winners")
+        self.counterLock.release()
 
         logging.info("action: sorteo | result: success")
         agencyID = message.split("|")[1] # Message is WINNERS|agencyID|PONG
@@ -106,10 +122,27 @@ class Agency:
     '''Returns the winners of the agency with ID agencyID'''
     def getWinnersForAgencyID(self, agencyID):
         winners = []
+        self.writeLock.acquire()
         bets = load_bets()
+        self.writeLock.release()
         for bet in bets:
             if bet.agency == int(agencyID) and has_won(bet):
                 logging.debug(f"winner with doc {bet.document}")
                 winners.append(bet.document)
 
         return winners
+
+    def InitializeLocks(self, writeLock, counterLock):
+        self.writeLock = writeLock
+        self.counterLock = counterLock
+
+    def UpdateCounter(self):
+        logging.debug("Acquiring counter lock")
+        self.counterLock.acquire()
+
+        self.agenciesProcessed += 1
+        self.agenciesProcessed = min(self.agenciesProcessed, self.amountOfAgencies) # Sanity check
+
+        logging.debug("Releasing counter lock")
+        self.counterLock.release()
+

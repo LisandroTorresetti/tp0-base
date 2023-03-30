@@ -2,6 +2,9 @@ import signal
 import socket
 import logging
 from .agency import *
+import threading
+from concurrent.futures import ThreadPoolExecutor
+
 
 class Server:
     def __init__(self, port, listen_backlog, agency):
@@ -21,16 +24,21 @@ class Server:
         finishes, servers starts to accept new connections again
         """
         signal.signal(signal.SIGTERM, self.__sigtermHandler)
+        writeLock = threading.Lock()
+        counterLock = threading.Lock()
+        self.agency.InitializeLocks(writeLock, counterLock)
 
-        while not self.sigtermCalled:
-            try:
-                client_sock = self.__accept_new_connection()
-                self.__handle_client_connection(client_sock)
-            except OSError:
-                if self.sigtermCalled:
-                    logging.info("signal SIGTERM received, shutting down server")
-                else:
-                    raise
+        with ThreadPoolExecutor(max_workers=self.agency.amountOfAgencies + 5) as executor:
+            while not self.sigtermCalled:
+                try:
+                    client_sock = self.__accept_new_connection()
+                    executor.submit(self.__handle_client_connection, client_sock)
+
+                except OSError:
+                    if self.sigtermCalled:
+                        logging.info("signal SIGTERM received, shutting down server")
+                    else:
+                        raise
 
     def __sigtermHandler(self, *args):
         self._server_socket.shutdown(socket.SHUT_RDWR)
@@ -45,12 +53,12 @@ class Server:
         client socket will also be closed
         """
         try:
-            self.agency.finishProcessing = False
+            finishProcessing = False
             addr = client_sock.getpeername()
             logging.info(f'action: receive_message | result: success | ip: {addr[0]}')
 
-            while not self.agency.finishProcessing:
-                self.agency.RegisterBet(client_sock)
+            while not finishProcessing:
+                finishProcessing = self.agency.RegisterBet(client_sock)
 
             logging.info(f'Processed all bets from ip: {addr[0]}')
 
