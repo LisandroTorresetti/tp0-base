@@ -90,8 +90,22 @@ func (ba *BetAgency) ProcessBatch() error {
 		log.Errorf("error sending FIN message from agency %v: %w", ba.ID, err)
 		return err
 	}
-
 	log.Debugf("All bets from agency %v were sent. Process batch status: FINISHED", ba.ID)
+	err = ba.client.CloseConnection()
+	if err != nil {
+		log.Debugf("Agecy %v: error closing client's connection: %w", err)
+		return err
+	}
+
+	log.Debugf("Agency %v: waiting for winners", ba.ID)
+	winners, err := ba.client.GetWinnersForAgency(ba.ID)
+	if err != nil {
+		log.Errorf("Agency %v: error getting winners: %w", ba.ID, err)
+		return err
+	}
+
+	log.Debugf("Agency %v: winner IDs: %v", ba.ID, winners)
+	log.Infof("action: consulta_ganadores | agencia: %v | result: success | cant_ganadores: %v", ba.ID, len(winners))
 	return nil
 }
 
@@ -112,7 +126,7 @@ func (ba *BetAgency) RegisterBets(betsToSend []string) error {
 
 	// Wait for server response
 	log.Debugf("Agency %v: Waiting for server's ack", ba.ID)
-	err = ba.client.ListenResponse()
+	_, err = ba.client.ListenResponse()
 	if err != nil {
 		log.Errorf("Agency %v: error while waiting for server's ACK: %w", ba.ID, err)
 	}
@@ -136,7 +150,7 @@ func (ba *BetAgency) RegisterBet() error {
 	}(ba.client)
 
 	log.Debugf("Waiting for server's response to know if the bet was persisted for agency %v", ba.betInfo.AgencyID)
-	err = ba.client.ListenResponse()
+	_, err = ba.client.ListenResponse()
 	if err != nil {
 		log.Errorf("error while listening server response: %w", err)
 		return err
