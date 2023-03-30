@@ -2,6 +2,7 @@
 
 from configparser import ConfigParser
 from common.server import Server
+from common.agency import Agency
 import logging
 import os
 
@@ -26,6 +27,8 @@ def initialize_config():
         config_params["port"] = int(os.getenv('SERVER_PORT', config["DEFAULT"]["SERVER_PORT"]))
         config_params["listen_backlog"] = int(os.getenv('SERVER_LISTEN_BACKLOG', config["DEFAULT"]["SERVER_LISTEN_BACKLOG"]))
         config_params["logging_level"] = os.getenv('LOGGING_LEVEL', config["DEFAULT"]["LOGGING_LEVEL"])
+        config_params["ack"] = os.getenv('ACK', config["DEFAULT"]["ACK"])
+        config_params["end_message_marker"] = os.getenv('END_MESSAGE_MARKER', config["DEFAULT"]["END_MESSAGE_MARKER"])
     except KeyError as e:
         raise KeyError("Key was not found. Error: {} .Aborting server".format(e))
     except ValueError as e:
@@ -48,7 +51,8 @@ def main():
                   f"listen_backlog: {listen_backlog} | logging_level: {logging_level}")
 
     # Initialize server and start server loop
-    server = Server(port, listen_backlog)
+    agency = Agency(config_params)
+    server = Server(port, listen_backlog, agency)
     server.run()
 
 def initialize_log(logging_level):
