@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 )
 
 const (
@@ -61,4 +62,19 @@ func (cbi ClientBetInfo) ToString() string {
 		cbi.BirthDate,
 		cbi.Number,
 	)
+}
+
+func FromStringToBet(agencyID int, stringBet string) ClientBetInfo {
+	splitBet := strings.Split(stringBet, ",")
+	clientID, _ := strconv.Atoi(splitBet[2])
+	number, _ := strconv.Atoi(splitBet[4])
+
+	return ClientBetInfo{
+		AgencyID:  agencyID,
+		ClientID:  clientID,
+		Name:      splitBet[0],
+		Surname:   splitBet[1],
+		BirthDate: splitBet[3],
+		Number:    number,
+	}
 }

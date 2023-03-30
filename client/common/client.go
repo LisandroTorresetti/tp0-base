@@ -13,6 +13,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+const endBatchMarker = "PING"
+
 // ClientConfig Configuration used by the client
 type ClientConfig struct {
 	ID               string
@@ -151,6 +153,14 @@ func (c *Client) SendBet(betInfo clientbetinfo.ClientBetInfo) error {
 	return nil
 }
 
+func (c *Client) CloseConnection() error {
+	return c.conn.Close()
+}
+
+func (c *Client) OpenConnection() error {
+	return c.createClientSocket()
+}
+
 func (c *Client) ListenResponse() error {
 	response := make([]byte, 0) // Will contain the response from the server
 
@@ -170,5 +180,67 @@ func (c *Client) ListenResponse() error {
 		}
 	}
 
-	return c.conn.Close()
+	return nil
+}
+
+func (c *Client) SendBetBatch(betsToSend []clientbetinfo.ClientBetInfo) error {
+	// Convert all bets in a string delimited with |, e.g bet1|bet2|bet3|...
+	betsAsString := ""
+	for _, bet := range betsToSend {
+		betStr := bet.ToString()
+		betStr += c.config.EndMessageMarker // Here we use the marker as a delimiter of bets
+		betsAsString += betStr
+	}
+	betsAsString += endBatchMarker
+	betAsBytes := []byte(betsAsString)
+	messageLength := len(betAsBytes)
+
+	amountOfMessages := int(messageLength/c.config.PacketLimit) + 1
+	log.Debugf("Amount of messages to send: %v", amountOfMessages)
+	shortWriteAvoidance := 0
+
+	for messageNum := 0; messageNum < amountOfMessages; messageNum++ {
+		log.Debugf("Message %v of %v", messageNum+1, amountOfMessages)
+
+		lowerLimit := messageNum*c.config.PacketLimit - shortWriteAvoidance
+		upperLimit := lowerLimit + c.config.PacketLimit
+
+		if upperLimit > messageLength {
+			upperLimit = messageLength
+		}
+
+		bytesToSend := betAsBytes[lowerLimit:upperLimit]
+		bytesSent, err := c.conn.Write(bytesToSend)
+		if err != nil {
+			return err
+		}
+		shortWriteAvoidance = len(bytesToSend) - bytesSent
+	}
+
+	log.Debugf("Bets from agency %v were sent!", betsToSend[0].AgencyID)
+	return nil
+}
+
+func (c *Client) SendFin() error {
+	log.Debug("SENDING FIN MESSAGE")
+	finMessage := []byte(c.config.ServerACK) // The server ACK will be our FIN message
+	lowerLimit := 0
+
+	for {
+		bytesToSend := len(finMessage[lowerLimit:])
+		bytesSent, err := c.conn.Write(finMessage[lowerLimit:])
+		if err != nil {
+			return err
+		}
+		diff := bytesToSend - bytesSent
+		if bytesToSend-bytesSent == 0 {
+			log.Debug("Fin message sent")
+			break
+		}
+
+		lowerLimit = diff
+	}
+
+	log.Debug("Waiting for server FIN ACK")
+	return c.ListenResponse()
 }

@@ -3,7 +3,8 @@ package main
 import (
 	"fmt"
 	"github.com/7574-sistemas-distribuidos/docker-compose-init/client/betagency"
-	"github.com/7574-sistemas-distribuidos/docker-compose-init/client/clientbetinfo"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -104,6 +105,16 @@ func main() {
 		log.Fatalf("%s", err)
 	}
 
+	agencyID, err := strconv.Atoi(os.Getenv("CLI_ID"))
+	if err != nil {
+		log.Debug("Agency ID must be numeric")
+	}
+
+	chunkSize, err := strconv.Atoi(os.Getenv("CHUNK_SIZE"))
+	if err != nil {
+		log.Debug("Chunk size must be numeric for agency %v", agencyID)
+	}
+
 	// Print program config with debugging purposes
 	PrintConfig(v)
 
@@ -118,22 +129,8 @@ func main() {
 	}
 	client := common.NewClient(clientConfig)
 
-	// Get client bet info
-	betInfo, err := clientbetinfo.GetBetInfo()
-	if err != nil {
-		log.Errorf("error getting bet info for client %v: %w", clientConfig.ID, err)
-		return
-	}
-	logrus.Infof("Client Bet Info: | Agency ID: %v | Client ID: %v | NAME: %s %s | NUMBER: %v ",
-		betInfo.AgencyID,
-		betInfo.ClientID,
-		betInfo.Name,
-		betInfo.Surname,
-		betInfo.Number,
-	)
-
-	betAgency := betagency.NewBetAgency(betInfo, client)
-	err = betAgency.RegisterBet()
+	betAgency := betagency.NewBetAgency(agencyID, client, chunkSize)
+	err = betAgency.ProcessBatch()
 
 	if err != nil {
 		logrus.Errorf(err.Error())
