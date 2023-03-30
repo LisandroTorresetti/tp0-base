@@ -1,10 +1,18 @@
 import logging
 from .utils import *
 
+PACKET_LIMIT = 8 * 1024 # 8kB
 class Agency:
 
     def __init__(self, config):
         self.config = config
+        self.betsDelimiter = self.config["bets_delimiter"]
+        self.allBetsReceivedMarker = config["all_bets_received"]
+        self.endMessageMarker = config["end_message_marker"]
+        self.amountOfAgencies = config["amount_of_agencies"]
+        self.processAction = config["process_action"] # ToDo: delete this variable we dont use it
+        self.winnersAction = config["winners_action"]
+        self.agenciesProcessed = 0
         self.finishProcessing = False
 
     '''Persists the bet of a client'''
@@ -21,26 +29,37 @@ class Agency:
     def RegisterBet(self, client):
         try:
             message = b''
-            packetLimit = 8 * 1024 # 8kB
-
             logging.debug("Listening message from client")
 
-            endMessageMarker = self.config["end_message_marker"].encode()
-            allBetsSentMarker = self.config["all_bets_received"].encode()
-
-            while (not endMessageMarker in message) and (not allBetsSentMarker in message):
-                actualMessage = client.recv(packetLimit)
+            while (not self.endMessageMarker.encode() in message) and (not self.allBetsReceivedMarker.encode() in message):
+                actualMessage = client.recv(PACKET_LIMIT)
                 message += actualMessage
 
             logging.debug("message received!")
-
-            if allBetsSentMarker in message:
-                logging.debug("Received FIN message, all bets were processed. Gonna send ACK to client")
-                self.SendACK(client)
-                self.finishProcessing = True
-                return
-
             message = message.decode('utf-8')
+
+            if self.allBetsReceivedMarker in message:
+                logging.debug(f"Message with action: {message}")
+                action = message.split("|")[0] # WINNERS or PONG
+
+                if action == self.winnersAction:
+                    logging.debug("A client is asking for the winners")
+                    self.SendWinners(client, message)
+                    self.finishProcessing = True
+                    return
+
+                if action == self.config["ack"]:
+                    logging.debug("Received FIN message, all bets were processed. Gonna send ACK to client")
+                    self.SendResponse(client, self.config["ack"])
+                    self.finishProcessing = True
+                    self.agenciesProcessed += 1
+                    self.agenciesProcessed = min(self.agenciesProcessed, self.amountOfAgencies) # Sanity check
+
+                    return
+
+                logging.debug("invalid action got: " + action)
+                raise Exception
+
             betsToPersist = []
 
             for betAsString in message.rstrip("|PING").split(self.config["bets_delimiter"]):
@@ -61,3 +80,36 @@ class Agency:
     def SendACK(self, client):
         logging.debug("sending ACK to client")
         client.send(self.config["ack"].encode('utf-8'))
+
+    def SendResponse(self, client, response):
+        logging.debug(f"sending {response} to client")
+        responseEncoded = response.encode('utf-8')
+        client.send(responseEncoded)
+        for lowerLimit in range(0, len(responseEncoded), PACKET_LIMIT):
+            bytesSent = client.send(responseEncoded[lowerLimit:lowerLimit + PACKET_LIMIT])
+            lowerLimit -= PACKET_LIMIT - bytesSent
+
+    def SendWinners(self, client, message):
+        if self.agenciesProcessed < self.amountOfAgencies:
+            logging.debug("Still processing agencies...")
+            response = "PROCESSING" + "|" + self.config["ack"]
+            client.send(response.encode('utf-8'))
+
+        logging.info("action: sorteo | result: success")
+        agencyID = message.split("|")[1] # Message is WINNERS|agencyID|PONG
+        logging.debug(f"Getting winners for agency {agencyID}")
+        winners = self.getWinnersForAgencyID(agencyID)
+        winnersConcat = ",".join(winners)
+        response = self.winnersAction + "|" + winnersConcat + "|" + self.config["ack"] # WINNERS|id1,id2,id3|PONG
+        self.SendResponse(client, response)
+
+    '''Returns the winners of the agency with ID agencyID'''
+    def getWinnersForAgencyID(self, agencyID):
+        winners = []
+        bets = load_bets()
+        for bet in bets:
+            if bet.agency == int(agencyID) and has_won(bet):
+                logging.debug(f"winner with doc {bet.document}")
+                winners.append(bet.document)
+
+        return winners
