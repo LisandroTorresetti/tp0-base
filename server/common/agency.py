@@ -94,6 +94,7 @@ class Agency:
             logging.debug("Still processing agencies...")
             response = "PROCESSING" + "|" + self.config["ack"]
             client.send(response.encode('utf-8'))
+            return # Missing return, was added in exercise 8
 
         logging.info("action: sorteo | result: success")
         agencyID = message.split("|")[1] # Message is WINNERS|agencyID|PONG
