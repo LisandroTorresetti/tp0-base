@@ -4,9 +4,11 @@ import (
 	"bufio"
 	"fmt"
 	"github.com/7574-sistemas-distribuidos/docker-compose-init/client/clientbetinfo"
+	"math/rand"
 	"net"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -161,7 +163,7 @@ func (c *Client) OpenConnection() error {
 	return c.createClientSocket()
 }
 
-func (c *Client) ListenResponse() error {
+func (c *Client) ListenResponse() (string, error) {
 	response := make([]byte, 0) // Will contain the response from the server
 
 	for {
@@ -169,18 +171,20 @@ func (c *Client) ListenResponse() error {
 		bytesRead, err := c.conn.Read(buffer)
 		if err != nil {
 			log.Errorf("unexpected error while trying to get server response: %w", err)
-			return err
+			return "", err
 		}
 
 		response = append(response, buffer[:bytesRead]...)
+		size := len(response)
 
-		if string(response) == c.config.ServerACK {
+		if size >= 4 && string(response[size-4:size]) == c.config.ServerACK {
 			log.Debugf("Got server ACK!")
 			break
 		}
 	}
-
-	return nil
+	serverResponse := string(response)
+	log.Debugf("Response from server: %s", serverResponse)
+	return serverResponse, nil
 }
 
 func (c *Client) SendBetBatch(betsToSend []clientbetinfo.ClientBetInfo) error {
@@ -242,5 +246,83 @@ func (c *Client) SendFin() error {
 	}
 
 	log.Debug("Waiting for server FIN ACK")
-	return c.ListenResponse()
+	_, err := c.ListenResponse()
+	return err
+}
+
+func (c *Client) SendMessage(message string) error {
+	log.Debugf("SENDING %s MESSAGE", message)
+	finMessage := []byte(message) // The server ACK will be our FIN message
+	lowerLimit := 0
+
+	for {
+		bytesToSend := len(finMessage[lowerLimit:])
+		bytesSent, err := c.conn.Write(finMessage[lowerLimit:])
+		if err != nil {
+			return err
+		}
+		diff := bytesToSend - bytesSent
+		if bytesToSend-bytesSent == 0 {
+			log.Debug("message %s sent", message)
+			break
+		}
+
+		lowerLimit = diff
+	}
+
+	return nil
+}
+
+func (c *Client) GetWinnersForAgency(agencyID int) ([]string, error) {
+	var winners []string
+	for {
+		err := c.OpenConnection()
+		if err != nil {
+			log.Errorf("Agency %v: error opening connection in winners loop: %w")
+			return []string{}, err
+		}
+
+		getWinnersMessage := fmt.Sprintf("WINNERS|%v|%s", agencyID, c.config.ServerACK) // WINNERS|agencyID|PONG
+		err = c.SendMessage(getWinnersMessage)
+		if err != nil {
+			log.Errorf("Agency %v: error sending get winners message: %w", agencyID, err)
+			return []string{}, err
+		}
+
+		log.Debugf("Agency %v: waiting for winners", agencyID)
+		response, err := c.ListenResponse() // Could be: PROCESSING|PONG or WINNERS|ID1,ID2,ID3|PONG
+		if err != nil {
+			log.Debugf("Agency %v: error receiving server response about winners: %w", agencyID, err)
+			return []string{}, err
+		}
+		if !keepAsking(response) {
+			log.Debugf("Agency %v: got winners %s", agencyID, response)
+			log.Debug("Agency %v: parse server response about winners", agencyID)
+			winners = parseServerResponse(response)
+			break
+		}
+
+		log.Debugf("Agency %v: keep asking for winners", agencyID)
+		err = c.CloseConnection()
+		if err != nil {
+			log.Errorf("Agency %v: error clossing connection in winners loop: %w")
+			return []string{}, err
+		}
+		timeToSleep := rand.Intn(100) + 1 // To avoid 0
+		time.Sleep(time.Duration(timeToSleep) * time.Microsecond)
+	}
+
+	return winners, nil
+}
+
+func keepAsking(response string) bool {
+	return strings.Split(response, "|")[0] == "PROCESSING"
+}
+
+func parseServerResponse(response string) []string {
+	winners := strings.Split(response, "|")[1] // Here response is: WINNERS|ID1,ID2,ID3|PONG
+	if len(winners) == 0 {
+		return []string{}
+	}
+	return strings.Split(winners, ",")
 }
