@@ -20,11 +20,7 @@ services:
     environment:
       - CLI_ID=1
       - CLI_LOG_LEVEL=DEBUG
-      - NOMBRE=Rafa
-      - APELLIDO=Nadal
-      - DOCUMENTO=19860603
-      - NACIMIENTO=1986-06-03
-      - NUMERO=1
+      - CHUNK_SIZE=50
     networks:
       - testing_net
     depends_on:
@@ -39,11 +35,7 @@ services:
     environment:
       - CLI_ID=2
       - CLI_LOG_LEVEL=DEBUG
-      - NOMBRE=Roger
-      - APELLIDO=Federer
-      - DOCUMENTO=19810802
-      - NACIMIENTO=1981-08-02
-      - NUMERO=2
+      - CHUNK_SIZE=50
     networks:
       - testing_net
     depends_on:
@@ -56,13 +48,9 @@ services:
     image: client:latest
     entrypoint: /client
     environment:
-      - CLI_ID=4
+      - CLI_ID=3
       - CLI_LOG_LEVEL=DEBUG
-      - NOMBRE=Jesse
-      - APELLIDO=Pinkman
-      - DOCUMENTO=19840924
-      - NACIMIENTO=1984-09-24
-      - NUMERO=7
+      - CHUNK_SIZE=50
     networks:
       - testing_net
     depends_on:
@@ -77,11 +65,7 @@ services:
     environment:
       - CLI_ID=4
       - CLI_LOG_LEVEL=DEBUG
-      - NOMBRE=Walter
-      - APELLIDO=White
-      - DOCUMENTO=19580907
-      - NACIMIENTO=1958-09-07
-      - NUMERO=28
+      - CHUNK_SIZE=50
     networks:
       - testing_net
     depends_on:
@@ -96,11 +80,7 @@ services:
     environment:
       - CLI_ID=5
       - CLI_LOG_LEVEL=DEBUG
-      - NOMBRE=Saul
-      - APELLIDO=Goodman
-      - DOCUMENTO=25052000
-      - NACIMIENTO=2000-05-25
-      - NUMERO=69
+      - CHUNK_SIZE=50
     networks:
       - testing_net
     depends_on:
