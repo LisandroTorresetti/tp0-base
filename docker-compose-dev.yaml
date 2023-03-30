@@ -20,6 +20,11 @@ services:
     environment:
       - CLI_ID=1
       - CLI_LOG_LEVEL=DEBUG
+      - NOMBRE=Rafa
+      - APELLIDO=Nadal
+      - DOCUMENTO=19860603
+      - NACIMIENTO=1986-06-03
+      - NUMERO=1
     networks:
       - testing_net
     depends_on:
@@ -34,6 +39,11 @@ services:
     environment:
       - CLI_ID=2
       - CLI_LOG_LEVEL=DEBUG
+      - NOMBRE=Roger
+      - APELLIDO=Federer
+      - DOCUMENTO=19810802
+      - NACIMIENTO=1981-08-02
+      - NUMERO=2
     networks:
       - testing_net
     depends_on:
@@ -41,12 +51,62 @@ services:
     volumes:
       - ./client/config.yaml:/client-config/config.yaml
 
-  netcat:
-    container_name: netcat
-    build: ./netcat
+  client3:
+    container_name: client3
+    image: client:latest
+    entrypoint: /client
+    environment:
+      - CLI_ID=4
+      - CLI_LOG_LEVEL=DEBUG
+      - NOMBRE=Jesse
+      - APELLIDO=Pinkman
+      - DOCUMENTO=19840924
+      - NACIMIENTO=1984-09-24
+      - NUMERO=7
     networks:
       - testing_net
+    depends_on:
+      - server
+    volumes:
+      - ./client/config.yaml:/client-config/config.yaml
 
+  client4:
+    container_name: client4
+    image: client:latest
+    entrypoint: /client
+    environment:
+      - CLI_ID=4
+      - CLI_LOG_LEVEL=DEBUG
+      - NOMBRE=Walter
+      - APELLIDO=White
+      - DOCUMENTO=19580907
+      - NACIMIENTO=1958-09-07
+      - NUMERO=28
+    networks:
+      - testing_net
+    depends_on:
+      - server
+    volumes:
+      - ./client/config.yaml:/client-config/config.yaml
+
+  client5:
+    container_name: client5
+    image: client:latest
+    entrypoint: /client
+    environment:
+      - CLI_ID=5
+      - CLI_LOG_LEVEL=DEBUG
+      - NOMBRE=Saul
+      - APELLIDO=Goodman
+      - DOCUMENTO=25052000
+      - NACIMIENTO=2000-05-25
+      - NUMERO=69
+    networks:
+      - testing_net
+    depends_on:
+      - server
+    volumes:
+      - ./client/config.yaml:/client-config/config.yaml
 
 networks:
   testing_net:
