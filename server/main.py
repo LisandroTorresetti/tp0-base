@@ -31,6 +31,10 @@ def initialize_config():
         config_params["end_message_marker"] = os.getenv('END_MESSAGE_MARKER', config["DEFAULT"]["END_MESSAGE_MARKER"])
         config_params["bets_delimiter"] = os.getenv('BETS_DELIMITER', config["DEFAULT"]["BETS_DELIMITER"])
         config_params["all_bets_received"] = os.getenv('ALL_BETS_RECEIVED', config["DEFAULT"]["ALL_BETS_RECEIVED"])
+        config_params["amount_of_agencies"] = int(os.getenv('AMOUNT_OF_AGENCIES', config["DEFAULT"]["AMOUNT_OF_AGENCIES"]))
+        config_params["process_action"] = os.getenv('PROCESS_ACTION', config["DEFAULT"]["PROCESS_ACTION"])
+        config_params["winners_action"] = os.getenv('WINNERS_ACTION', config["DEFAULT"]["WINNERS_ACTION"])
+
     except KeyError as e:
         raise KeyError("Key was not found. Error: {} .Aborting server".format(e))
     except ValueError as e:
