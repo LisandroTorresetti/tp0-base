@@ -45,9 +45,14 @@ class Server:
         client socket will also be closed
         """
         try:
+            self.agency.finishProcessing = False
             addr = client_sock.getpeername()
             logging.info(f'action: receive_message | result: success | ip: {addr[0]}')
-            self.agency.RegisterBet(client_sock)
+
+            while not self.agency.finishProcessing:
+                self.agency.RegisterBet(client_sock)
+
+            logging.info(f'Processed all bets from ip: {addr[0]}')
 
         except OSError as e:
             logging.error(f"action: receive_message | result: fail | error: {e}")

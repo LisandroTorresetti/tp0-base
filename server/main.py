@@ -29,6 +29,8 @@ def initialize_config():
         config_params["logging_level"] = os.getenv('LOGGING_LEVEL', config["DEFAULT"]["LOGGING_LEVEL"])
         config_params["ack"] = os.getenv('ACK', config["DEFAULT"]["ACK"])
         config_params["end_message_marker"] = os.getenv('END_MESSAGE_MARKER', config["DEFAULT"]["END_MESSAGE_MARKER"])
+        config_params["bets_delimiter"] = os.getenv('BETS_DELIMITER', config["DEFAULT"]["BETS_DELIMITER"])
+        config_params["all_bets_received"] = os.getenv('ALL_BETS_RECEIVED', config["DEFAULT"]["ALL_BETS_RECEIVED"])
     except KeyError as e:
         raise KeyError("Key was not found. Error: {} .Aborting server".format(e))
     except ValueError as e:
@@ -54,6 +56,7 @@ def main():
     agency = Agency(config_params)
     server = Server(port, listen_backlog, agency)
     server.run()
+    logging.debug("Finish server.py")
 
 def initialize_log(logging_level):
     """
