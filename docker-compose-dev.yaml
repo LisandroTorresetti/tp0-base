@@ -11,7 +11,7 @@ services:
     networks:
       - testing_net
     volumes:
-      - ./server/config.ini:/server-config/config.ini
+      - ./server/config.ini:/config.ini
 
   client1:
     container_name: client1
@@ -25,7 +25,7 @@ services:
     depends_on:
       - server
     volumes:
-      - ./client/config.yaml:/client-config/config.yaml
+      - ./client/config.yaml:/config.yaml
 
   client2:
     container_name: client2
@@ -39,7 +39,7 @@ services:
     depends_on:
       - server
     volumes:
-      - ./client/config.yaml:/client-config/config.yaml
+      - ./client/config.yaml:/config.yaml
 
 networks:
   testing_net:
@@ -47,7 +47,3 @@ networks:
       driver: default
       config:
         - subnet: 172.25.125.0/24
-
-volumes:
-  client-config:
-  server-config:

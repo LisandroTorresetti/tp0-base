@@ -17,7 +17,7 @@ def getClientsStructure(amountOfClients):
                           f"    depends_on:\n" \
                           f"      - server\n" \
                           f"    volumes:\n" \
-                          f"      - ./client/config.yaml:/client-config/config.yaml\n"
+                          f"      - ./client/config.yaml:/config.yaml\n"
 
         clients.append(clientStructure)
 

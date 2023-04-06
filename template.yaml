@@ -11,7 +11,7 @@ services:
     networks:
       - testing_net
     volumes:
-      - ./server/config.ini:/server-config/config.ini
+      - ./server/config.ini:/config.ini
 
 #Clients
 
@@ -22,6 +22,3 @@ networks:
       config:
         - subnet: 172.25.125.0/24
 
-volumes:
-  client-config:
-  server-config:
